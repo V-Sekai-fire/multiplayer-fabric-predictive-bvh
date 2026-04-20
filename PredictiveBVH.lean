@@ -24,6 +24,9 @@ import PredictiveBVH.Spatial.EMLAdversarialHeuristic
 import PredictiveBVH.Protocol.ScaleContradictionsGapClass
 import PredictiveBVH.Protocol.AbyssalSLA
 
+-- Relativistic zone theory (no ego, no god, no determinism)
+import PredictiveBVH.Relativistic.NoGod
+
 -- Resources
 import PredictiveBVH.Formulas.Resources
 
