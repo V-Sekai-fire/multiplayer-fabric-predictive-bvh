@@ -114,26 +114,25 @@ def update (t : PbvhTree) (id : LeafId) (bounds : BoundingBox)
 
 -- ── build: sort live leaves by hilbert, construct internals ──────────────────
 
-/-- Insertion-sort pass over `sorted` indices by `leaves[·].hilbert`. Stable
-    on equal codes. Dead leaves are filtered out before sorting. -/
+/-- Insert `x` into a list already sorted ascending by `key`, preserving
+    stability: existing entries with a key equal to `key x` keep their place,
+    and `x` lands immediately after them. -/
+private def insertSortedByHilbert (key : LeafId → Nat) (x : LeafId) :
+    List LeafId → List LeafId
+  | [] => [x]
+  | y :: rest =>
+    if key x < key y then x :: y :: rest
+    else y :: insertSortedByHilbert key x rest
+
+/-- Stable insertion sort of `ids` by `leaves[·].hilbert`. Out-of-bounds ids
+    sort as if their key were 0 (defensive, matches the previous panic-avoiding
+    accessor). Pure structural recursion — no `Id.run do`. Equivalent in
+    observable behaviour to the prior in-place implementation; the functional
+    form admits direct `sorted_is_ascending_after_build`-style proofs. -/
 private def insertionSortByHilbert
     (leaves : Array PbvhLeaf) (ids : Array LeafId) : Array LeafId :=
-  let n := ids.size
-  Id.run do
-    let mut arr := ids
-    let mut i := 1
-    while i < n do
-      let mut j := i
-      while j > 0 &&
-            (leaves[arr[j]!]?.map (·.hilbert)).getD 0 <
-            (leaves[arr[j-1]!]?.map (·.hilbert)).getD 0 do
-        let a := arr[j]!
-        let b := arr[j-1]!
-        arr := arr.set! j b
-        arr := arr.set! (j-1) a
-        j := j - 1
-      i := i + 1
-    return arr
+  let key (id : LeafId) : Nat := (leaves[id]?.map (·.hilbert)).getD 0
+  (ids.foldl (fun acc x => insertSortedByHilbert key x acc) ([] : List LeafId)).toArray
 
 /-- Live leaf ids in tombstone-stripped original-index order. -/
 private def liveIds (leaves : Array PbvhLeaf) : Array LeafId :=
