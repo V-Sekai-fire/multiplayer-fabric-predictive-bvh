@@ -7,7 +7,7 @@ Guidance for AI coding agents working in this submodule.
 Canonical mathematical authority for all physics, geometry, and algorithmic
 proofs across the multiplayer-fabric stack. Contains formal Lean 4 proofs
 and a code-generation pipeline that writes `predictive_bvh.h` (C header
-consumed by the Godot mmog module).
+consumed by the mmog module).
 
 **Do not implement algorithms elsewhere that contradict a proof here.
 If an implementation differs from the Lean proof, trust the proof.**
@@ -34,7 +34,6 @@ Lean toolchain version is pinned in `lean-toolchain`.
 | `PredictiveBVH/` | Proof modules (Spatial, Formulas, Protocol, Relativistic, Codegen, Interest) |
 | `PredictiveBVH/Codegen/CodeGen.lean` | Code-generation entrypoint → `predictive_bvh.h` |
 | `predictive_bvh.h` | Generated C header (committed, not hand-edited) |
-| `predictive_bvh.rs` | Rust adapter (for Cargo-based consumers) |
 
 ## What is proved
 
@@ -48,7 +47,7 @@ Lean toolchain version is pinned in `lean-toolchain`.
 ## Conventions
 
 - New algorithms go here first as Lean proofs, then get ported to Elixir/C++.
-- Cross-reference scan must include `.h`, `.c`, `.cpp` — the generated header
+- Cross-reference scan must include `.h`, `.c`, `.cpp` — the generated C header
   is the bridge to production code.
 - Commit message style: sentence case, no `type(scope):` prefix.
   Example: `Prove O(1) refit bound for incremental BVH updates`
