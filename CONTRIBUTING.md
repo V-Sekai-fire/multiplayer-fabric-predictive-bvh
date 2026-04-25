@@ -1,10 +1,10 @@
 # Contributing to `predictive_bvh`
 
 This module is a Lean-proved BVH with a codegen pipeline that emits
-`predictive_bvh.h` / `predictive_bvh.rs` from Lean sources. The invariant
-is that every algorithmic claim about the emitted C must trace back to a
-proof under [PredictiveBVH/](PredictiveBVH/). No hand-written C appears
-in the header except through the paths documented below.
+`predictive_bvh.h` from Lean sources. The invariant is that every
+algorithmic claim about the emitted C must trace back to a proof under
+[PredictiveBVH/](PredictiveBVH/). No hand-written C appears in the header
+except through the paths documented below.
 
 ## Mental model
 
@@ -15,12 +15,11 @@ in the header except through the paths documented below.
   only. Comparisons, ternaries, and booleans are not ring ops.
 - **`bvh-codegen`** is the IO entry. `lake exe bvh-codegen` writes
   `predictive_bvh.h` (consumed by
-  [`core/math/predictive_bvh_adapter.h`](../../core/math/predictive_bvh_adapter.h))
-  and `predictive_bvh.rs` (consumed by downstream Rust clients).
+  [`core/math/predictive_bvh_adapter.h`](../../core/math/predictive_bvh_adapter.h)).
 - **Proof layout.** `PredictiveBVH/Spatial/` — tree ops + query proofs.
   `PredictiveBVH/Formulas/` — algebraic formulas (ghost bound, surface
   area, EML gaps). `PredictiveBVH/Protocol/` — fabric, interest,
-  capacity. `PredictiveBVH/Codegen/` — C + Rust emission.
+  capacity. `PredictiveBVH/Codegen/` — C emission.
 
 ## The codegen pipeline
 
@@ -54,16 +53,14 @@ as raw string literals. That's where hand-written C is permitted — but
   - **Z ↔ GF(2) bridge** (shipped). Sign-bit extraction turns a
     comparison into a ring operation over GF(2)ⁿ; min / max / contains /
     overlap all become branchless ring polynomials with a witness
-    sign bit. Already used by the Rust emission for `aabb_union_ring`,
-    `aabb_contains_ring`, `aabb_overlaps_ring` — see
-    [Codegen/CodeGen.lean:280](PredictiveBVH/Codegen/CodeGen.lean#L280)
-    onward. The C-side `aabb_union` / `aabb_contains` / `aabb_overlaps`
-    in [`aabbC`](PredictiveBVH/Codegen/CodeGen.lean) still use the
-    hand-written `r128_le ? a : b` ternary form; migrating them to the
-    bridge is on the roadmap.
-  - **Blend pattern** (shipped). `cond ? new : old = old + flag * (new - old)`
-    once `flag ∈ {0, 1}`. See `bvh_blend` at
-    [Codegen/CodeGen.lean:134](PredictiveBVH/Codegen/CodeGen.lean#L134).
+    sign bit. `aabb_overlaps_ring` is emitted via `genC` in
+    [`aabbC`](PredictiveBVH/Codegen/CodeGen.lean). The C-side
+    `aabb_union` / `aabb_contains` / `aabb_overlaps` in the adapter
+    still use the hand-written `r128_le ? a : b` ternary form;
+    migrating them to the bridge is on the roadmap.
+  - **Blend pattern** (available). `cond ? new : old = old + flag * (new - old)`
+    once `flag ∈ {0, 1}`. The expression is proved in Lean and evaluable
+    via `evalExpr`; wire it into `genC` if a blend is needed in C emission.
     Composes cleanly with the bridge's sign-bit flag.
 - **Boilerplate C functions** that aren't templated (one-off glue,
   struct constructors, etc.) go in
@@ -78,7 +75,7 @@ cd thirdparty/predictive_bvh
 lake build                   # expect: 313 jobs green
 
 # Regenerate emitted files
-lake exe bvh-codegen         # writes predictive_bvh.h + predictive_bvh.rs
+lake exe bvh-codegen         # writes predictive_bvh.h
 
 # Back to repo root — regression gate
 cd ../..
@@ -145,7 +142,7 @@ over-emission inside a proof gap is tolerated.
 | [Protocol/WaypointBound.lean](PredictiveBVH/Protocol/WaypointBound.lean) | Waypoint distance bound |
 | [Protocol/AbyssalSLA.lean](PredictiveBVH/Protocol/AbyssalSLA.lean) | Abyssal-tier SLA bounds |
 | [Interest/AuthorityInterest.lean](PredictiveBVH/Interest/AuthorityInterest.lean) | `InterestReplica`, authority zone |
-| [Codegen/CodeGen.lean](PredictiveBVH/Codegen/CodeGen.lean) | `genC` / `genRs` pipeline + header assembly |
+| [Codegen/CodeGen.lean](PredictiveBVH/Codegen/CodeGen.lean) | `genC` pipeline + header assembly |
 | [Codegen/TreeC.lean](PredictiveBVH/Codegen/TreeC.lean) | Tree-op C (control-flow only) |
 | [Codegen/QuinticHermite.lean](PredictiveBVH/Codegen/QuinticHermite.lean) | C³ quintic Hermite basis |
 
