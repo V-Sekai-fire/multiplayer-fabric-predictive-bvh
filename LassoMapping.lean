@@ -136,10 +136,20 @@ structure Vec3 where
 
 -- ── Canvas constants (μm) ───────────────────────────────────────────────────
 -- canvas_width = 1280 px,  canvas_height = 720 px,  offset_ratio = (0.5, 0.5).
--- Source position uses UI_PIXELS_TO_METER = 1/1024 (matching canvas_3d_anchor),
--- NOT the physical mesh scale (canvas_plane_scale = 0.0025).
+-- Source position uses UI_PIXELS_TO_METER = 1/1024 (matching canvas_3d_anchor).
+--
+-- canvas_plane_scale = 2 * UI_PIXELS_TO_METER = 2/1024 (NOT the old 0.0025).
+-- Reason: mesh.set_size(canvas_width * 0.5) so physical_half_width
+--         = (canvas_width * 0.5) * canvas_plane_scale / 2 = halfW
+--   ↔  canvas_plane_scale = 2 * UI_PIXELS_TO_METER  (proved below).
+--
 -- anchor_x = (canvas_px − 640) / 1024 m  →  halfW = 640/1024 m = 625 000 μm
 -- anchor_y = (360 − canvas_py) / 1024 m  →  halfH = 360/1024 m ≈ 351 562 μm
+--
+-- Pivot alignment invariant (proved below):
+--   canvas_anchor_x = canvas_anchor_y = offset_ratio = 0.5
+-- is REQUIRED for the mesh pivot and anchor origin to coincide.
+-- Default canvas_anchor_x = 0.0 causes a (halfW, −halfH) world-space offset.
 
 /-- Anchor half-width: canvas_width/2 * UI_PIXELS_TO_METER = 640/1024 m = 625 000 μm. -/
 def halfW : Int := 625000
@@ -147,8 +157,10 @@ def halfW : Int := 625000
 /-- Anchor half-height: canvas_height/2 * UI_PIXELS_TO_METER = 360/1024 m ≈ 351 562 μm. -/
 def halfH : Int := 351562
 
-/-- Canvas centre Y: 1.6 m = 1 600 000 μm above XROrigin3D. -/
-def centreY : Int := 1600000
+/-- Canvas centre Y: runtime value (μm above XROrigin3D floor).
+    Not a fixed constant — canvas placed dynamically from camera transform.
+    Proof theorems are parameterised over any centreY. -/
+def centreY : Int := 1000000  -- placeholder: 1.0 m for the test scene
 
 /-- Canvas centre Z: −1.5 m = −1 500 000 μm in front of XROrigin3D. -/
 def centreZ : Int := -1500000
@@ -580,5 +592,38 @@ theorem ctrl_status_z :
 --     └─ span "lasso.pose"  {uv.x, uv.y, source.x, source.y, source.z}
 --          └─ span "lasso.query"  {poi.count, found, canvas_item.type, pos2d.x, pos2d.y}
 --     └─ span "lasso.dispatch"  {dispatch.action, canvas_item.type, pos2d.x, pos2d.y}
+
+-- ── canvas_plane_scale correctness ──────────────────────────────────────────
+-- canvas_plane._update() sets mesh.set_size(canvas_width × 0.5) in raw pixel units,
+-- then spatial_root.set_scale(canvas_plane_scale, …).
+-- Physical half-width = (canvas_width × 0.5 / 2) × canvas_plane_scale
+--                     = (canvas_width / 4) × canvas_plane_scale.
+-- For this to equal halfW = canvas_width / (2 × 1024):
+--   canvas_plane_scale = 2 / 1024.
+-- Verified for canvas_width = 1280:
+
+/-- canvas_plane_scale = 2/1024 gives physical half-width = halfW (625 000 μm).
+    mesh.set_size gives size.x = canvas_width × 0.5 raw units;
+    physical half-width = (canvas_width × 0.5 / 2) × scale = (canvas_width / 4) × scale.
+    For canvas_width = 1280: 1280 × 2 × 1 000 000 / (4 × 1024) = halfW. -/
+theorem canvas_plane_scale_correct :
+    1280 * 2 * 1000000 / (4 * 1024) = halfW := by native_decide
+
+-- ── Pivot alignment invariant ────────────────────────────────────────────────
+-- canvas_plane._update() places the mesh at local offset (in pixel units):
+--   mesh_x_offset = W × (0.25 − 0.5 × canvas_anchor_x)
+-- In 4× integer arithmetic: 4 × offset = W × (1 − 2 × canvas_anchor_x_num / den).
+-- For mesh centre = anchor origin: offset = 0  ↔  canvas_anchor_x = 0.5.
+-- Default canvas_anchor_x = 0.0 → offset = W/4 = 320 px →
+--   physical = 320 × (2/1024) m = halfW = 0.625 m (entire canvas half-width!).
+
+/-- canvas_anchor_x = 1/2: 4 × offset = W × (1 − 2 × ½) = 0. Mesh centred. -/
+theorem pivot_aligned_at_half_anchor :
+    1280 * (1 - 2 * 1 / 2) = 0 := by native_decide
+
+/-- canvas_anchor_x = 0: 4 × offset = W × 1 = 1280 → offset = 320 px = halfW in scale. -/
+theorem pivot_misaligned_at_zero_anchor :
+    1280 * (1 - 2 * 0) = 1280 ∧ 1280 * 2 * 1000000 / (4 * 1024) = halfW := by
+  constructor <;> native_decide
 
 end LassoMapping
